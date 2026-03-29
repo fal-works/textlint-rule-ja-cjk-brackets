@@ -15,7 +15,7 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=20"
   },
   "scripts": {
     "test": "mocha test/index.test.js"

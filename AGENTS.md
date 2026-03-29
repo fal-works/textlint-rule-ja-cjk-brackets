@@ -4,6 +4,6 @@
 
 - 開発過程で参照する資料の保存場所: `local/` ディレクトリ
 - 技術スタック:
-    - Node.js (dev: v24+, support: v22+)
+    - Node.js (dev: v24+, support: v20+)
     - `textlint` (latest)
     - Mocha（`textlint-tester` 経由）
