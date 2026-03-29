@@ -17,7 +17,7 @@ npm install --save-dev textlint @fal-works/textlint-rule-ja-cjk-brackets
 ```json
 {
   "rules": {
-    "ja-cjk-brackets": true
+    "@fal-works/ja-cjk-brackets": true
   }
 }
 ```
