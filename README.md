@@ -45,6 +45,20 @@ npm install --save-dev textlint @fal-works/textlint-rule-ja-cjk-brackets
 (`日本語`)    →  OK
 ```
 
+**リンクはリンクテキストを判定対象に含めます。** URL 部分は判定に使いません。
+
+```
+([日本語](url))    →  Error → （[日本語](url)）
+（[english](url)）  →  Error → ([english](url))
+```
+
+**画像は alt text を含めて判定対象にしません。** 画像は内容に関わらず非CJKとして扱います。
+
+```
+（![日本語](url)）  →  Error → (![日本語](url))
+(![日本語](url))    →  OK
+```
+
 ### 入れ子括弧
 
 入れ子括弧はそれぞれ独立して判定されます。Markdown の強調（`**`）などの inline 要素をまたぐ括弧も検出・修正の対象です。
