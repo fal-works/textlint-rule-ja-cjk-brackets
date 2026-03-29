@@ -60,7 +60,3 @@ npm install --save-dev textlint textlint-rule-ja-cjk-brackets
 ## 対象括弧
 
 `(` (U+0028) / `)` (U+0029) および `（` (U+FF08) / `）` (U+FF09) のみが対象です。`[`、`【`、`「` などは対象外です。
-
-## ライセンス
-
-MIT
