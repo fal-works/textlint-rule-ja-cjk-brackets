@@ -43,6 +43,9 @@ tester.run("ja-cjk-brackets", rule, {
         "(**english**)",   // 半角・CJK なし ✓
         "（*日本語*）",            // 全角・CJK あり ✓
         "（*日本語と English*）",  // 全角・CJK あり（混在でも CJK があれば全角）✓
+        // インラインコードは内容に関わらず非 CJK 扱い
+        "(`日本語`)",   // インラインコードは非 CJK → 半角 ✓
+        "(`abc`)",      // インラインコードは非 CJK → 半角 ✓
     ],
     invalid: [
         // ---- 半角→全角 ----
@@ -183,6 +186,17 @@ tester.run("ja-cjk-brackets", rule, {
             text: "(*日本語*)",
             output: "（*日本語*）",
             errors: [{ message: CJK_FULL }, { message: CJK_FULL }],
+        },
+        // ---- インラインコード（内容に関わらず非 CJK 扱い）----
+        {
+            text: "（`日本語`）",
+            output: "(`日本語`)",
+            errors: [{ message: ASCII_HALF }, { message: ASCII_HALF }],
+        },
+        {
+            text: "（`abc`）",
+            output: "(`abc`)",
+            errors: [{ message: ASCII_HALF }, { message: ASCII_HALF }],
         },
     ],
 });
