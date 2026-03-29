@@ -7,7 +7,7 @@
 ## インストール
 
 ```sh
-npm install --save-dev textlint textlint-rule-ja-cjk-brackets
+npm install --save-dev textlint @fal-works/textlint-rule-ja-cjk-brackets
 ```
 
 ## 使い方
