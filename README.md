@@ -40,11 +40,14 @@ npm install --save-dev textlint textlint-rule-ja-cjk-brackets
 
 ### 入れ子括弧
 
-入れ子括弧はそれぞれ独立して判定されます。
+入れ子括弧はそれぞれ独立して判定されます。Markdown の強調（`**`）などの inline 要素をまたぐ括弧も検出・修正の対象です。
 
 ```
 （テスト (test) 結果）  →  OK（外：CJK あり → 全角、内：CJK なし → 半角）
 (テスト (inner) 結果)  →  外だけ Error → （テスト (inner) 結果）
+
+（**abc**）    →  Error → (**abc**)   （括弧内に CJK なし → 半角）
+(**日本語**)  →  Error → （**日本語**）（括弧内に CJK あり → 全角）
 ```
 
 ## 対象括弧

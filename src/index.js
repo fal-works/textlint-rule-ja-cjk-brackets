@@ -33,69 +33,107 @@ function findBracketPairs(text) {
 }
 
 /**
- * Build the corrected replacement text for a bracket pair.
- * Also corrects any nested bracket pairs within the span.
- * Since '(' (U+0028) and '（' (U+FF08) are both 1 code unit, replacements
- * do not shift positions of other characters.
+ * DFS で子孫の Str ノードをすべて収集する。
+ * Code（インラインコード）は children を持たないため自動的に除外される。
  *
- * @param {string} text - original full text of the node
- * @param {ReturnType<typeof findBracketPairs>} allPairs - all pairs in the node
- * @param {number} openIndex
- * @param {number} closeIndex
- * @param {boolean} needsFullwidth
- * @returns {string}
+ * @param {object} node
+ * @param {object} Syntax
+ * @returns {object[]}
  */
-function buildFixedText(text, allPairs, openIndex, closeIndex, needsFullwidth) {
-    const chars = [...text.slice(openIndex + 1, closeIndex)];
-    const offset = openIndex + 1;
-
-    // Apply corrections to any nested bracket pairs within this span
-    for (const pair of allPairs) {
-        if (pair.openIndex > openIndex && pair.closeIndex < closeIndex) {
-            const pairNeedsFull = CJK_PATTERN.test(pair.inner);
-            chars[pair.openIndex - offset] = pairNeedsFull ? "（" : "(";
-            chars[pair.closeIndex - offset] = pairNeedsFull ? "）" : ")";
+function collectStrNodes(node, Syntax) {
+    const results = [];
+    function dfs(n) {
+        if (n.type === Syntax.Str) {
+            results.push(n);
+            return;
+        }
+        for (const child of n.children ?? []) {
+            dfs(child);
         }
     }
+    dfs(node);
+    return results;
+}
 
-    const correctOpen = needsFullwidth ? "（" : "(";
-    const correctClose = needsFullwidth ? "）" : ")";
-    return correctOpen + chars.join("") + correctClose;
+/**
+ * Str ノードのテキストを連結して仮想テキストを構築し、
+ * 各 UTF-16 code unit の位置からノード・ノード内位置へのマップを作る。
+ *
+ * getSource(node) を使うことで、fixer.replaceTextRange の相対 index と
+ * 一致する（node.value はエスケープ文字等で raw ソースと乖離しうる）。
+ *
+ * @param {object[]} strNodes
+ * @param {(node: object) => string} getSource
+ * @returns {{ text: string, posMap: Array<{ nodeIdx: number, indexInNode: number }> }}
+ */
+function buildVirtualText(strNodes, getSource) {
+    let text = "";
+    const posMap = [];
+
+    strNodes.forEach((node, nodeIdx) => {
+        const src = getSource(node);
+        for (let i = 0; i < src.length; i++) {
+            posMap.push({ nodeIdx, indexInNode: i });
+        }
+        text += src;
+    });
+
+    return { text, posMap };
+}
+
+/**
+ * @param {object} node - Paragraph / Header / TableCell ノード
+ * @param {{ report, RuleError, fixer, getSource, locator, Syntax }} ctx
+ */
+function processInlineContainer(node, ctx) {
+    const { report, RuleError, fixer, getSource, locator, Syntax } = ctx;
+
+    const strNodes = collectStrNodes(node, Syntax);
+    if (strNodes.length === 0) return;
+
+    const { text, posMap } = buildVirtualText(strNodes, getSource);
+    const pairs = findBracketPairs(text);
+
+    for (const { openIndex, closeIndex, openChar, closeChar, inner } of pairs) {
+        const needsFullwidth = CJK_PATTERN.test(inner);
+        const correctOpen = needsFullwidth ? "（" : "(";
+        const correctClose = needsFullwidth ? "）" : ")";
+        const message = needsFullwidth
+            ? "CJK文字を含む括弧は全角（）を使用してください"
+            : "CJK文字を含まない括弧は半角()を使用してください";
+
+        if (openChar !== correctOpen) {
+            const { nodeIdx, indexInNode } = posMap[openIndex];
+            report(
+                strNodes[nodeIdx],
+                new RuleError(message, {
+                    padding: locator.range([indexInNode, indexInNode + 1]),
+                    fix: fixer.replaceTextRange([indexInNode, indexInNode + 1], correctOpen),
+                })
+            );
+        }
+
+        if (closeChar !== correctClose) {
+            const { nodeIdx, indexInNode } = posMap[closeIndex];
+            report(
+                strNodes[nodeIdx],
+                new RuleError(message, {
+                    padding: locator.range([indexInNode, indexInNode + 1]),
+                    fix: fixer.replaceTextRange([indexInNode, indexInNode + 1], correctClose),
+                })
+            );
+        }
+    }
 }
 
 const reporter = (context) => {
     const { Syntax, report, RuleError, fixer, getSource, locator } = context;
+    const process = (node) =>
+        processInlineContainer(node, { report, RuleError, fixer, getSource, locator, Syntax });
     return {
-        [Syntax.Str](node) {
-            const text = getSource(node);
-            const pairs = findBracketPairs(text);
-
-            for (const { openIndex, closeIndex, openChar, closeChar, inner } of pairs) {
-                const needsFullwidth = CJK_PATTERN.test(inner);
-                const correctOpen = needsFullwidth ? "（" : "(";
-                const correctClose = needsFullwidth ? "）" : ")";
-
-                if (openChar === correctOpen && closeChar === correctClose) continue;
-
-                const fixedText = buildFixedText(text, pairs, openIndex, closeIndex, needsFullwidth);
-
-                report(
-                    node,
-                    new RuleError(
-                        needsFullwidth
-                            ? "CJK文字を含む括弧は全角（）を使用してください"
-                            : "CJK文字を含まない括弧は半角()を使用してください",
-                        {
-                            padding: locator.range([openIndex, openIndex + 1]),
-                            fix: fixer.replaceTextRange(
-                                [openIndex, closeIndex + 1],
-                                fixedText
-                            ),
-                        }
-                    )
-                );
-            }
-        },
+        [Syntax.Paragraph]: process,
+        [Syntax.Header]: process,
+        [Syntax.TableCell]: process,
     };
 };
 
